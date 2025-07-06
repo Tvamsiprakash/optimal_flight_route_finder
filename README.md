@@ -39,7 +39,7 @@ A system to visualize and optimize flight routes between airports using Dijkstra
 ### Steps
 1. Clone the repository:
    ```bash
-   git clone https://github.com/your-username/flight-route-optimization.git
+   git clone https://github.com/Tvamsiprakash/flight-route-optimization.git
    cd flight-route-optimization
    ```
 2. Install dependencies:
