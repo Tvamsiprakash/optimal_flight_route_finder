@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Flight Route Visualizer</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css">
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        #form-container {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            z-index: 1000;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            width: 250px;
+        }
+        #map { height: 100vh; }
+        .form-group { margin-bottom: 12px; }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background-color: #45a049; }
+        #status {
+            margin-top: 10px;
+            font-size: 14px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="form-container">
+        <form id="routeForm">
+            <div class="form-group">
+                <input type="text" id="source" placeholder="Source code (e.g., VJA)" required>
+            </div>
+            <div class="form-group">
+                <input type="text" id="destination" placeholder="Destination code (e.g., DEL)" required>
+            </div>
+            <div class="form-group">
+                <select id="mode" required>
+                    <option value="" disabled selected>Select Mode</option>
+                    <option value="cost">Cost</option>
+                    <option value="time">Time</option>
+                    <option value="stops">Stops</option>
+                </select>
+            </div>
+            <button type="submit" id="submitBtn">Get Route</button>
+            <div id="status"></div>
+        </form>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-polylinedecorator@1.6.0/dist/leaflet.polylineDecorator.js"></script>
+    <script>
+        const form = document.getElementById('routeForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const statusDiv = document.getElementById('status');
+        let map;
+        let currentMarkers = [];
+        let currentPolylines = [];
+        let currentDecorators = [];
+
+        // Initialize map
+        function initMap() {
+            if (!map) {
+                map = L.map('map').setView([20, 0], 2);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 18,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(map);
+            }
+        }
+
+        // Clear existing route
+        function clearRoute() {
+            // Clear all existing markers and routes
+            currentMarkers.forEach(marker => map.removeLayer(marker));
+            currentPolylines.forEach(line => map.removeLayer(line));
+            currentDecorators.forEach(decorator => map.removeLayer(decorator));
+            
+            currentMarkers = [];
+            currentPolylines = [];
+            currentDecorators = [];
+            
+            // Reset map view
+            if (map) {
+                map.setView([20, 0], 2);
+            }
+        }
+
+        // Draw new route
+        async function drawRoute() {
+            try {
+                statusDiv.textContent = "Loading route data...";
+                statusDiv.style.color = "blue";
+                
+                const response = await fetch('/api/route');
+                if (!response.ok) {
+                    throw new Error('Failed to load route data');
+                }
+                
+                const data = await response.json();
+                
+                clearRoute();
+                
+                // Draw all points
+                const latlngs = data.route.map(pt => [pt.lat, pt.lon]);
+                
+                // Create markers
+                data.route.forEach((pt, index) => {
+                    const marker = L.marker([pt.lat, pt.lon]).addTo(map);
+                    currentMarkers.push(marker);
+                    
+                    let popupContent = `<b>${pt.name}</b><br>ID: ${pt.id}`;
+                    if (index > 0 && index < data.route.length - 1) {
+                        popupContent += `<br>Stop ${index}`;
+                    }
+                    marker.bindPopup(popupContent);
+                });
+                
+                // Highlight source (green)
+                const source = data.route[0];
+                const sourceMarker = L.circleMarker([source.lat, source.lon], {
+                    color: 'green',
+                    radius: 10,
+                    fillOpacity: 1
+                }).addTo(map).bindPopup(`<b>Source:</b> ${source.name}`);
+                currentMarkers.push(sourceMarker);
+                
+                // Highlight destination (blue)
+                const dest = data.route[data.route.length - 1];
+                const destMarker = L.circleMarker([dest.lat, dest.lon], {
+                    color: 'blue',
+                    radius: 10,
+                    fillOpacity: 1
+                }).addTo(map).bindPopup(`<b>Destination:</b> ${dest.name}`);
+                currentMarkers.push(destMarker);
+                
+                // Draw the route line
+                const polyline = L.polyline(latlngs, {
+                    color: 'red',
+                    weight: 3
+                }).addTo(map);
+                currentPolylines.push(polyline);
+                
+                // Add direction arrows
+                const decorator = L.polylineDecorator(polyline, {
+                    patterns: [{
+                        offset: 0,
+                        repeat: 100,
+                        symbol: L.Symbol.arrowHead({
+                            pixelSize: 10,
+                            polygon: false,
+                            pathOptions: { stroke: true, color: 'black' }
+                        })
+                    }]
+                }).addTo(map);
+                currentDecorators.push(decorator);
+                
+                // Fit map to route bounds
+                map.fitBounds(polyline.getBounds());
+                
+                statusDiv.textContent = "Route displayed successfully!";
+                statusDiv.style.color = "green";
+                
+            } catch (error) {
+                console.error('Error drawing route:', error);
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.style.color = "red";
+            }
+        }
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const source = document.getElementById('source').value;
+            const destination = document.getElementById('destination').value;
+            const mode = document.getElementById('mode').value;
+            
+            submitBtn.disabled = true;
+            statusDiv.textContent = "Generating route...";
+            statusDiv.style.color = "blue";
+            
+            try {
+                const response = await fetch('/api/generate-route', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source, destination, mode })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Route generation failed');
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'no_route') {
+                    clearRoute();
+                    statusDiv.textContent = "No flight path exists between these airports";
+                    statusDiv.style.color = "orange";
+                } 
+                else if (result.status === 'ok') {
+                    await drawRoute();
+                }
+                else {
+                    throw new Error(result.message || 'Unknown error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.style.color = "red";
+            } finally {
+                submitBtn.disabled = false;
+            }
+        });
+
+        // Initialize map on load
+        document.addEventListener('DOMContentLoaded', initMap);
+    </script>
+</body>
+</html>

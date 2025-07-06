@@ -1,0 +1,36 @@
+# Ignore build directory
+/build/
+
+# Ignore compiled binary
+/flight_optimizer.exe
+
+# Ignore Node modules
+/node_modules/
+
+# Ignore logs
+*.log
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore Visual Studio Code settings
+.vscode/
+
+# Ignore CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# Ignore data generated during runtime
+*.out
+*.obj
+*.o
+*.tmp
+
+# Ignore route or airport temp files
+*.dat
+
+# Ignore generated JSON files, if dynamic
+route.json
