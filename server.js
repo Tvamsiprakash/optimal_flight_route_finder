@@ -32,7 +32,7 @@ app.post('/api/generate-route', (req, res) => {
 
 
 
-    const command = `"${path.join(__dirname, 'build', 'Debug', 'flight_optimizer.exe')}" ${source} ${destination} ${mode}`;
+    const command = `"${path.join(__dirname, 'bin', 'flight_optimizer.exe')}" ${source} ${destination} ${mode}`;
     console.log(`Executing: ${command}`);
 
     exec(command, (error, stdout, stderr) => {
